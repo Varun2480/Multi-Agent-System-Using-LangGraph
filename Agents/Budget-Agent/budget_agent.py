@@ -1,4 +1,5 @@
 import os
+import ast
 import json
 from typing import Dict, Any, List
 from dotenv import load_dotenv
@@ -171,6 +172,21 @@ def delete_category_budget(item_id: int) -> Dict[str, Any]:
             raise
 
 
+def deep_json_eval(data):
+    if isinstance(data, dict):
+        return {k: deep_json_eval(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [deep_json_eval(item) for item in data]
+    elif isinstance(data, str):
+        try:
+            parsed = json.loads(data)
+            return deep_json_eval(parsed)
+        except (json.JSONDecodeError, TypeError):
+            return data
+    else:
+        return data
+
+
 @app.post("/invoke_agent", response_model=AgentResponse)
 def invoke_agent(request: QueryRequest):
     model = init_chat_model("gemini-1.5-flash", 
@@ -183,6 +199,7 @@ def invoke_agent(request: QueryRequest):
         with open(file_path, 'r') as file:
             prompt_content = file.read()
         LOGGER.info("Prompt imported successfully:")
+        LOGGER.info(f"Prompt is {prompt_content}")
     except FileNotFoundError:
         LOGGER.error(f"Error: The file '{file_path}' was not found.")
         raise Exception(f"Prompt file not found: {file_path}")
@@ -209,15 +226,22 @@ def invoke_agent(request: QueryRequest):
         {"messages": [{"role": "user", 
                     "content": request.query}]}
     )
+    import pdb; pdb.set_trace()
+    response = response['messages'][-1].content
+
+    if isinstance(response, str):
+        response = response.replace("json", "")
+        response = response.replace("\n", "")
+        response = response.replace("```", "")
+        
+        # Step 1: Safely evaluate the outer dictionary
+        evaluated_response = ast.literal_eval(response)
+
     
-    final_response = response['messages'][-1].content
-    final_response = final_response.replace("json", "")
-    final_response = final_response.replace("\n", "")
-    final_response = final_response.replace("```", "")
-    final_response = json.loads(final_response)
+    # Step 2: Recursively parse nested JSON strings
+    final_json_response = deep_json_eval(evaluated_response)
 
-    return AgentResponse(final_response=final_response)
-
+    return AgentResponse(response=final_json_response)
 
 
 # {

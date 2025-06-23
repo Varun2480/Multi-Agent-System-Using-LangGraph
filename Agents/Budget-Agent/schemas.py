@@ -2,7 +2,7 @@
 
 import datetime
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, field_serializer
+from pydantic import BaseModel, field_serializer, field_validator
 from enum import Enum as PyEnum # Renamed to avoid conflict with Pydantic's Enum if any
 
 # CategoryBudgetOverview Models
@@ -29,16 +29,25 @@ class CategoryBudgetOverview(CategoryBudgetOverviewBase):
 
 # TransactionDetail Models
 class TransactionDetailBase(BaseModel):
-    transaction_date: datetime.date
+    transaction_date: Optional[datetime.date] = None
     category: str
     description: Optional[str] = None
     amount_inr: float
     type: str # e.g. "expense", "income"
     location: Optional[str] = None
 
-    @field_serializer('transaction_date')
-    def serialize_transaction_date(self, dt: datetime.date) -> int:
-        return int(datetime.datetime(dt.year, dt.month, dt.day).timestamp())
+    # Validator to set current date if not provided
+    
+    @field_validator('transaction_date', mode='before')
+    def set_default_date(cls, value):
+        return value or datetime.date.today()
+    
+    
+    # Validator to store category in lowercase
+    @field_validator('category', mode='before')
+    def lowercase_category(cls, value):
+        return value.lower() if value else value
+
 
 class TransactionDetailCreate(TransactionDetailBase):
     pass
@@ -84,4 +93,4 @@ class QueryRequest(BaseModel):
     query: str
 
 class AgentResponse(BaseModel):
-    final_response: Dict[str, Any]
+    response: Dict[str, Any]
