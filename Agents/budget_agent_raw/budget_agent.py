@@ -226,7 +226,6 @@ def invoke_agent(request: QueryRequest):
         {"messages": [{"role": "user", 
                     "content": request.query}]}
     )
-    import pdb; pdb.set_trace()
     response = response['messages'][-1].content
 
     if isinstance(response, str):
