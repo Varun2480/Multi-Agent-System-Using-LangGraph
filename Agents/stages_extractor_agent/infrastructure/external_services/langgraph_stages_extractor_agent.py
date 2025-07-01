@@ -1,22 +1,13 @@
-import ast
 import json
 from typing import Union
 from langgraph.prebuilt import create_react_agent
 from langchain.chat_models import init_chat_model
 from core.logger import LOGGER
-from agents.budget_agent.domain.schemas import (BudgetAgentResponse, QueryRequest)
-from agents.budget_agent.infrastructure.tools.budget_agent_tools import (add_category_budget,  
-                                      add_transaction,
-                                      get_all_category_budgets,
-                                      get_all_transactions,
-                                      update_category_budget,
-                                      update_transaction,
-                                      delete_category_budget,
-                                      delete_transaction
-                                      )
+from agents.stages_extractor_agent.domain.schemas import (QueryRequest, StagesExtractorAgentResponse)
+from agents.stages_extractor_agent.infrastructure.tools.stages_extract_agent_tools import process_video
                
 
-class LangGraphBudgetAgent:
+class LangGraphStagesExtractorAgent:
 
     def _deep_json_eval(self, data):
         if isinstance(data, dict):
@@ -32,11 +23,11 @@ class LangGraphBudgetAgent:
         else:
             return data
 
-
-    def invoke_agent(self, request: QueryRequest) -> BudgetAgentResponse:
+    def invoke_agent(self, request: QueryRequest) -> StagesExtractorAgentResponse:
         model = init_chat_model("gemini-2.5-flash", model_provider="google_genai", temperature=0)
 
-        file_path = 'agents/budget_agent/infrastructure/prompts/prompt_2.txt'
+        file_path = 'agents/stages_extractor_agent/infrastructure/prompts/agent_prompt.txt'
+
 
         try:
             with open(file_path, 'r') as file:
@@ -49,18 +40,14 @@ class LangGraphBudgetAgent:
             LOGGER.error(f"Error reading prompt file: {e}")
             raise Exception(f"Error reading prompt file: {e}")
 
-        budget_agent = create_react_agent(
+        stages_extract_agent = create_react_agent(
             model=model,
-            tools=[
-                add_category_budget, add_transaction, get_all_category_budgets,
-                get_all_transactions, update_transaction, update_category_budget,
-                delete_transaction, delete_category_budget
-            ],
+            tools=[process_video],
             prompt=prompt_content,
-            name="budget_agent",
+            name="stages_extract_agent",
         )
 
-        response = budget_agent.invoke({
+        response = stages_extract_agent.invoke({
             "messages": [{"role": "user", "content": request.query}]
         })
 
@@ -78,7 +65,7 @@ class LangGraphBudgetAgent:
         except (ValueError, SyntaxError):
             parsed_response = cleaned_response  # Return as plain string
 
-        return BudgetAgentResponse(response=parsed_response)
+        return StagesExtractorAgentResponse(response=parsed_response)
 
     
-LANGGRAPH_BUDGET_AGENT = LangGraphBudgetAgent()
+LANGGRAPH_STAGES_EXTRACT_AGENT = LangGraphStagesExtractorAgent()
